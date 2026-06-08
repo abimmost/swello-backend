@@ -5,11 +5,35 @@ from utils.logger import setup_logger
 logger = setup_logger(__name__)
 
 from contextlib import asynccontextmanager
+from core.config import get_settings
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     logger.info("Swello Backend starting up...")
+    
+    settings = get_settings()
+    ngrok_tunnel = None
+    
+    if settings.ngrok_authtoken:
+        try:
+            from pyngrok import ngrok
+            ngrok.set_auth_token(settings.ngrok_authtoken)
+            ngrok_tunnel = ngrok.connect(8000, domain="marisela-falsifiable-ridiculously.ngrok-free.dev")
+            logger.info(f"🚀 ngrok tunnel created: {ngrok_tunnel.public_url}")
+            logger.info(f"👉 Public API Docs available at: {ngrok_tunnel.public_url}/docs")
+        except Exception as e:
+            logger.error(f"Failed to start ngrok: {e}")
+
     yield
+    
+    if ngrok_tunnel:
+        try:
+            from pyngrok import ngrok
+            logger.info("Closing ngrok tunnel...")
+            ngrok.disconnect(ngrok_tunnel.public_url)
+            ngrok.kill()
+        except:
+            pass
 
 app = FastAPI(
     title="Swello Backend API",
@@ -19,10 +43,17 @@ app = FastAPI(
 )
 
 # CORS configuration
+origins = [
+    "http://localhost:3000",
+    "http://localhost:5173", # Standard local React/Vite port
+    "https://ais-dev-5k5xeohw6i3lge2dd5qjs6-353443648426.europe-west2.run.app",
+    "https://ais-pre-5k5xeohw6i3lge2dd5qjs6-353443648426.europe-west2.run.app",
+]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"], # For development, allow all origins
-    allow_credentials=True,
+    allow_origins=origins,
+    allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )

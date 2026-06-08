@@ -1,14 +1,14 @@
 from fastapi import APIRouter, Depends, HTTPException
 from typing import Any
+from supabase import Client
 from core.supabase import supabase
-from core.auth import get_current_user
+from core.auth import get_current_user, get_authed_client
 from models.meal_plans import AddPlannedMealRequest
 from services.nutrition import calculate_balanced_level_score, aggregate_weekly_nutrition
 from utils.logger import setup_logger
 
 logger = setup_logger(__name__)
 router = APIRouter(prefix="/meal-plan", tags=["meal-plan"])
-
 
 
 
@@ -28,7 +28,7 @@ async def get_meal_plan(start_date: str, end_date: str, current_user: Any = Depe
         data = plan_response.data
 
         # Calculate real weekly nutrition aggregation
-        weekly_balance = _aggregate_weekly_nutrition(data)
+        weekly_balance = aggregate_weekly_nutrition(data)
 
         logger.info(f"Meal plan fetched: {len(data)} plans, weekly score: {weekly_balance['score']}")
         return {
@@ -41,14 +41,18 @@ async def get_meal_plan(start_date: str, end_date: str, current_user: Any = Depe
 
 
 @router.post("/add")
-async def add_to_meal_plan(request: AddPlannedMealRequest, current_user: Any = Depends(get_current_user)):
+async def add_to_meal_plan(
+    request: AddPlannedMealRequest,
+    current_user: Any = Depends(get_current_user),
+    authed_client: Client = Depends(get_authed_client)
+):
     """Assign a recipe to a specific day in the plan."""
     logger.info(
         f"Adding meal {request.meal_id} to plan {request.meal_plan_id} "
         f"on {request.scheduled_date} for user {current_user.id}"
     )
     try:
-        # Verify the plan belongs to the user
+        # Verify the plan belongs to the user (read — global client is fine)
         plan_check = supabase.table("meal_plans").select("id").eq(
             "id", request.meal_plan_id
         ).eq("user_id", current_user.id).single().execute()
@@ -57,7 +61,8 @@ async def add_to_meal_plan(request: AddPlannedMealRequest, current_user: Any = D
             logger.warning(f"Plan {request.meal_plan_id} not found for user {current_user.id}")
             raise HTTPException(status_code=404, detail="Meal plan not found")
 
-        response = supabase.table("planned_meals").insert({
+        # Write using authed_client so RLS sees the user
+        response = authed_client.table("planned_meals").insert({
             "meal_plan_id": request.meal_plan_id,
             "meal_id": request.meal_id,
             "scheduled_date": request.scheduled_date,
@@ -74,11 +79,16 @@ async def add_to_meal_plan(request: AddPlannedMealRequest, current_user: Any = D
 
 
 @router.delete("/{plan_id}")
-async def remove_from_meal_plan(plan_id: str, current_user: Any = Depends(get_current_user)):
+async def remove_from_meal_plan(
+    plan_id: str,
+    current_user: Any = Depends(get_current_user),
+    authed_client: Client = Depends(get_authed_client)
+):
     """Remove a planned meal from the schedule."""
     logger.info(f"Removing planned meal {plan_id} for user {current_user.id}")
     try:
-        response = supabase.table("planned_meals").delete().eq("id", plan_id).execute()
+        # Use authed_client so RLS enforces ownership
+        response = authed_client.table("planned_meals").delete().eq("id", plan_id).execute()
         logger.info(f"Planned meal {plan_id} removed successfully.")
         return {"status": "success", "message": "Planned meal removed"}
     except Exception as e:
