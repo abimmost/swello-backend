@@ -27,12 +27,13 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-from api import users_router, recipes_router, meal_plans_router, ai_router
+from api import users_router, recipes_router, meal_plans_router, ai_router, auth_router
 
 app.include_router(users_router)
 app.include_router(recipes_router)
 app.include_router(meal_plans_router)
 app.include_router(ai_router)
+app.include_router(auth_router)
 
 @app.get("/health")
 def health_check():
