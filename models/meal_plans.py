@@ -1,17 +1,39 @@
-from pydantic import BaseModel, ConfigDict
-from typing import List, Optional
-from datetime import date
+from pydantic import BaseModel, ConfigDict, model_validator
+from typing import List, Optional, Any
+from datetime import date, datetime
 from uuid import UUID
 from .meals import MealResponse
 
 class PlannedMealBase(BaseModel):
     meal_id: UUID
-    scheduled_date: date
     status: Optional[str] = 'planned'
 
 class PlannedMealResponse(PlannedMealBase):
+    id: UUID
     meal_plan_id: UUID
+    scheduled_date: str
+    scheduled_time: Optional[str] = None
     meal: Optional[MealResponse] = None
+
+    @model_validator(mode='before')
+    @classmethod
+    def split_datetime(cls, data: Any) -> Any:
+        if isinstance(data, dict) and 'scheduled_date' in data:
+            val = data['scheduled_date']
+            if val and 'T' in str(val):
+                dt_str = str(val)
+                parts = dt_str.split('T')
+                data['scheduled_date'] = parts[0]
+                time_part = parts[1].replace('Z', '').replace('+00:00', '')
+                time_str = time_part[:5] if time_part else None
+                
+                # If time is exactly midnight, assume no time was selected
+                if time_str == "00:00":
+                    time_str = None
+                    
+                data['scheduled_time'] = time_str
+        return data
+
     model_config = ConfigDict(from_attributes=True)
 
 class MealPlanBase(BaseModel):
@@ -39,6 +61,6 @@ class MealPlanResponse(MealPlanBase):
 
 class AddPlannedMealRequest(BaseModel):
     """Request body for POST /meal-plan/add."""
-    meal_plan_id: str
     meal_id: str
     scheduled_date: str  # YYYY-MM-DD
+    scheduled_time: Optional[str] = None  # HH:MM

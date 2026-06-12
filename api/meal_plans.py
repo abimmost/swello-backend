@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException
 from typing import Any
+from datetime import timedelta, datetime, time as dt_time
 from supabase import Client
 from core.supabase import supabase
 from core.auth import get_current_user, get_authed_client
@@ -46,26 +47,50 @@ async def add_to_meal_plan(
     current_user: Any = Depends(get_current_user),
     authed_client: Client = Depends(get_authed_client)
 ):
-    """Assign a recipe to a specific day in the plan."""
+    """Assign a recipe to a specific day/time, auto-creating the weekly plan if needed."""
     logger.info(
-        f"Adding meal {request.meal_id} to plan {request.meal_plan_id} "
-        f"on {request.scheduled_date} for user {current_user.id}"
+        f"Adding meal {request.meal_id} on {request.scheduled_date} for user {current_user.id}"
     )
     try:
-        # Verify the plan belongs to the user (read — global client is fine)
-        plan_check = supabase.table("meal_plans").select("id").eq(
-            "id", request.meal_plan_id
-        ).eq("user_id", current_user.id).single().execute()
+        # 1. Combine scheduled_date and scheduled_time into ISO8601
+        date_obj = datetime.strptime(request.scheduled_date, "%Y-%m-%d").date()
+        if request.scheduled_time:
+            # Shift explicit midnight selections to 00:01 to preserve them from the "no time" guardrail
+            if request.scheduled_time == "00:00":
+                time_obj = dt_time(0, 1)
+            else:
+                time_obj = datetime.strptime(request.scheduled_time, "%H:%M").time()
+        else:
+            time_obj = dt_time(0, 0)
+        
+        combined_dt = datetime.combine(date_obj, time_obj)
+        iso_datetime_str = combined_dt.isoformat() + "Z"
 
-        if not plan_check.data:
-            logger.warning(f"Plan {request.meal_plan_id} not found for user {current_user.id}")
-            raise HTTPException(status_code=404, detail="Meal plan not found")
+        # Determine week start (Monday) and end (Sunday)
+        week_start = date_obj - timedelta(days=date_obj.weekday())
+        week_end = week_start + timedelta(days=6)
 
-        # Write using authed_client so RLS sees the user
+        # 2. Find existing plan
+        plan_check = authed_client.table("meal_plans").select("id").eq(
+            "user_id", current_user.id
+        ).eq("start_date", str(week_start)).eq("end_date", str(week_end)).execute()
+
+        if plan_check.data:
+            meal_plan_id = plan_check.data[0]['id']
+        else:
+            # 3. Create new plan for this week
+            plan_create = authed_client.table("meal_plans").insert({
+                "user_id": current_user.id,
+                "start_date": str(week_start),
+                "end_date": str(week_end)
+            }).execute()
+            meal_plan_id = plan_create.data[0]['id']
+
+        # 4. Insert into planned_meals
         response = authed_client.table("planned_meals").insert({
-            "meal_plan_id": request.meal_plan_id,
+            "meal_plan_id": meal_plan_id,
             "meal_id": request.meal_id,
-            "scheduled_date": request.scheduled_date,
+            "scheduled_date": iso_datetime_str,
             "status": "planned"
         }).execute()
 
