@@ -17,7 +17,7 @@ async def list_recipes(
 ):
     logger.info(f"Fetching recipes - limit: {limit}, offset: {offset}")
     try:
-        response = supabase.table("recipes").select("*, meals(*)").range(offset, offset + limit - 1).execute()
+        response = supabase.table("recipes").select("*, meals(*)").eq("is_ai_generated", False).range(offset, offset + limit - 1).execute()
         return response.data
     except Exception as e:
         logger.error(f"Error fetching recipes: {e}")
@@ -39,6 +39,12 @@ async def search_recipes(
             query = query.contains("tags", tag_list)
 
         response = query.execute()
+        
+        # Filter out AI generated recipes from the nested meals results
+        for meal in response.data:
+            if "recipes" in meal:
+                meal["recipes"] = [r for r in meal["recipes"] if not r.get("is_ai_generated", False)]
+                
         return response.data
     except Exception as e:
         logger.error(f"Error searching recipes: {e}")
