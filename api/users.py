@@ -10,10 +10,13 @@ logger = setup_logger(__name__)
 router = APIRouter(prefix="/users", tags=["users"])
 
 @router.get("/me", response_model=ProfileResponse)
-async def get_my_profile(current_user: Any = Depends(get_current_user)):
+async def get_my_profile(
+    current_user: Any = Depends(get_current_user),
+    authed_client: Client = Depends(get_authed_client)
+):
     logger.info(f"Fetching profile for user: {current_user.id}")
     try:
-        response = supabase.table("profiles").select("*").eq("id", current_user.id).single().execute()
+        response = authed_client.table("profiles").select("*").eq("id", current_user.id).single().execute()
         if not response.data:
             logger.warning(f"Profile not found for user: {current_user.id}")
             raise HTTPException(status_code=404, detail="Profile not found")
@@ -41,10 +44,13 @@ async def update_my_profile(
         raise HTTPException(status_code=500, detail="Internal server error")
 
 @router.get("/me/bookmarks")
-async def get_my_bookmarks(current_user: Any = Depends(get_current_user)):
+async def get_my_bookmarks(
+    current_user: Any = Depends(get_current_user),
+    authed_client: Client = Depends(get_authed_client)
+):
     logger.info(f"Fetching bookmarks for user: {current_user.id}")
     try:
-        response = supabase.table("bookmarks").select("recipe_id, recipes(*, meals(*))").eq("user_id", current_user.id).execute()
+        response = authed_client.table("bookmarks").select("recipe_id, recipes(*, meals(*))").eq("user_id", current_user.id).execute()
         return response.data
     except Exception as e:
         logger.error(f"Error fetching bookmarks: {e}")

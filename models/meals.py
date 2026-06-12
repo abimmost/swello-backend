@@ -29,9 +29,7 @@ class MealBase(BaseModel):
     description: Optional[str] = None
     image_url: Optional[str] = None
     tags: List[str] = []
-    difficulty: Optional[str] = None
     duration_minutes: Optional[int] = None
-    budget: Optional[str] = None
     balanced_level_score: Optional[int] = None
 
 class MealCreate(MealBase):

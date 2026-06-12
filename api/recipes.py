@@ -80,9 +80,7 @@ async def create_recipe(
             "description": request.description,
             "image_url": request.image_url,
             "tags": request.tags,
-            "difficulty": request.difficulty,
             "duration_minutes": request.duration_minutes,
-            "budget": request.budget,
             "is_custom": True,
             "author_id": str(current_user.id),
         }).execute()

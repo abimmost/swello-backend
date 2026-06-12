@@ -19,6 +19,40 @@ from utils.logger import setup_logger
 
 logger = setup_logger(__name__)
 
+FALLBACK_MODELS = [
+    "gemini-3.5-flash",
+    "gemini-3-flash",
+    "gemini-2.5-flash",
+    "gemini-3.1-flash-lite",
+    "gemini-2.5-flash-lite"
+]
+
+def _execute_with_fallback(prompt: str, schema: dict) -> str:
+    """Executes the Gemini API call with rate limit detection and fallback routing."""
+    for model_name in FALLBACK_MODELS:
+        try:
+            logger.debug(f"AI Editor: Attempting Gemini call with model {model_name}")
+            interaction = client.interactions.create(
+                model=model_name,
+                input=prompt,
+                response_format={
+                    "type": "text",
+                    "mime_type": "application/json",
+                    "schema": schema
+                },
+            )
+            return interaction.output_text
+        except Exception as e:
+            error_msg = str(e).lower()
+            # 429 Too Many Requests, Quota Exceeded, or Resource Exhausted
+            if "429" in error_msg or "quota" in error_msg or "rate limit" in error_msg or "exhausted" in error_msg:
+                logger.warning(f"AI Editor: Model {model_name} rate limited/quota exceeded. Falling back...")
+                continue
+            else:
+                logger.error(f"AI Editor: Non-rate-limit error with {model_name}: {e}")
+                raise e
+    
+    raise Exception("All fallback models exhausted due to rate limits.")
 
 # --- Initialize Gemini client ---
 
@@ -139,7 +173,7 @@ async def _call_gemini_for_edit(
     # Build the ingredient list string for the prompt
     ingredients_text = "\n".join([
         f"- {ri.get('ingredients', {}).get('name', 'Unknown')}: "
-        f"{ri.get('measurement_value', '')} {ri.get('measurement_type', '')} "
+        f"{ri.get('measurement_value', '')} "
         f"({'ESSENTIAL' if ri.get('is_essential') else 'removable'})"
         for ri in recipe_ingredients
     ])
@@ -188,17 +222,12 @@ async def _call_gemini_for_edit(
     logger.debug(f"AI Editor: Sending prompt to Gemini (length: {len(prompt)} chars)")
 
     try:
-        interaction = client.interactions.create(
-            model="gemini-3.5-flash",
-            input=prompt,
-            response_format={
-                "type": "text",
-                "mime_type": "application/json",
-                "schema": GeminiEditResult.model_json_schema()
-            },
+        output_text = _execute_with_fallback(
+            prompt=prompt,
+            schema=GeminiEditResult.model_json_schema()
         )
 
-        result = GeminiEditResult.model_validate_json(interaction.output_text)
+        result = GeminiEditResult.model_validate_json(output_text)
         logger.info(f"AI Editor: Gemini response parsed successfully. Valid: {result.is_valid}")
         return result
 
@@ -240,17 +269,12 @@ Calculate a Balanced Level Score from 0-100 based on the nutritional balance.
 """
 
     try:
-        interaction = client.interactions.create(
-            model="gemini-3.5-flash",
-            input=prompt,
-            response_format={
-                "type": "text",
-                "mime_type": "application/json",
-                "schema": NutritionEstimate.model_json_schema()
-            },
+        output_text = _execute_with_fallback(
+            prompt=prompt,
+            schema=NutritionEstimate.model_json_schema()
         )
 
-        result = NutritionEstimate.model_validate_json(interaction.output_text)
+        result = NutritionEstimate.model_validate_json(output_text)
         logger.info(f"AI Nutrition: Calculation complete. BLS: {result.balanced_level_score}/100")
         return result.model_dump()
 
