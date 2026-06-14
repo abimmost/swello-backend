@@ -47,7 +47,8 @@ app = FastAPI(
 
 # CORS configuration
 origins = [
-    "https://swello-v1-117902704067.europe-west1.run.app",
+    "https://ais-dev-qtjuilbx4zfshehl6yqen7-934525312260.europe-west2.run.app",
+    "https://ais-pre-qtjuilbx4zfshehl6yqen7-934525312260.europe-west2.run.app",
     "http://localhost:3000",
     "http://localhost:5173", # Standard local React/Vite port
     "https://ais-dev-5k5xeohw6i3lge2dd5qjs6-353443648426.europe-west2.run.app",
