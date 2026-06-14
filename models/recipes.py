@@ -48,5 +48,7 @@ class CreateRecipeRequest(BaseModel):
     tags: List[str] = []
     duration_minutes: Optional[int] = None
     # Recipe fields
+    ingredients: List[dict] = []
     steps: List[str] = []
     cookware: List[str] = []
+    is_custom: Optional[bool] = False

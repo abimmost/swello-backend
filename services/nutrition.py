@@ -20,11 +20,11 @@ IDEAL_FAT_PERCENTAGE = 25.0
 # Maximum deviation allowed before score drops to 0 for that macro
 MAX_DEVIATION = 40.0
 
-# Weights for each macro in the overall score
-PROTEIN_WEIGHT = 0.35
-CARB_WEIGHT = 0.30
-FAT_WEIGHT = 0.20
-MICRONUTRIENT_WEIGHT = 0.15
+# Weights for each macro and micronutrient diversity in the overall BLS
+PROTEIN_WEIGHT = 0.38
+CARB_WEIGHT = 0.35
+FAT_WEIGHT = 0.22
+MICRONUTRIENT_WEIGHT = 0.05
 
 # Micronutrient thresholds for "present" (non-zero contribution)
 MICRO_FIELDS = [

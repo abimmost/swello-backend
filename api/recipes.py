@@ -27,9 +27,10 @@ async def list_recipes(
 @router.get("/search")
 async def search_recipes(
     q: Optional[str] = None,
-    tags: Optional[str] = None
+    tags: Optional[str] = None,
+    ingredients: Optional[str] = None
 ):
-    logger.info(f"Searching recipes - q: {q}, tags: {tags}")
+    logger.info(f"Searching recipes - q: {q}, tags: {tags}, ingredients: {ingredients}")
     try:
         query = supabase.table("meals").select("*, recipes(*)")
         if q:
@@ -37,6 +38,44 @@ async def search_recipes(
         if tags:
             tag_list = [t.strip() for t in tags.split(",")]
             query = query.contains("tags", tag_list)
+            
+        if ingredients:
+            ing_list = [i.strip() for i in ingredients.split(",")]
+            # Step 1: Find ingredient IDs using case-insensitive ilike per ingredient
+            ing_ids = []
+            for ing_name in ing_list:
+                res = supabase.table("ingredients").select("id").ilike("name", ing_name).execute()
+                if res.data:
+                    ing_ids.append(res.data[0]["id"])
+
+            # Must find a valid DB match for every requested ingredient — enforce AND semantics
+            if len(ing_ids) == len(ing_list):
+                # Step 2: Find recipe IDs containing those ingredients
+                ri_res = supabase.table("recipe_ingredients").select("recipe_id, ingredient_id").in_("ingredient_id", ing_ids).execute()
+                if ri_res.data:
+                    # Group by recipe_id to enforce AND logic
+                    from collections import defaultdict
+                    recipe_ing_map = defaultdict(set)
+                    for row in ri_res.data:
+                        recipe_ing_map[row["recipe_id"]].add(row["ingredient_id"])
+
+                    # Keep only recipes that have ALL the requested ingredients
+                    recipe_ids = [r_id for r_id, i_ids in recipe_ing_map.items() if len(i_ids) == len(ing_ids)]
+
+                    if recipe_ids:
+                        # Step 3: Find meal IDs for those recipes
+                        r_res = supabase.table("recipes").select("meal_id").in_("id", recipe_ids).execute()
+                        if r_res.data:
+                            meal_ids = [r["meal_id"] for r in r_res.data]
+                            query = query.in_("id", meal_ids)
+                        else:
+                            query = query.in_("id", ["00000000-0000-0000-0000-000000000000"]) # Force empty
+                    else:
+                        query = query.in_("id", ["00000000-0000-0000-0000-000000000000"])
+                else:
+                    query = query.in_("id", ["00000000-0000-0000-0000-000000000000"])
+            else:
+                query = query.in_("id", ["00000000-0000-0000-0000-000000000000"])
 
         response = query.execute()
         
@@ -102,7 +141,7 @@ async def create_recipe(
             "meal_id": meal_id,
             "steps": request.steps,
             "cookware": request.cookware,
-            "is_ai_generated": False,
+            "is_ai_generated": request.is_custom if request.is_custom is not None else False,
             "editor_id": str(current_user.id),
         }).execute()
 
@@ -110,6 +149,39 @@ async def create_recipe(
             raise HTTPException(status_code=500, detail="Failed to create recipe record")
 
         recipe_id = recipe_response.data[0]["id"]
+        
+        # 3. Handle ingredients
+        if request.ingredients:
+            recipe_ingredients_to_insert = []
+            for ing in request.ingredients:
+                ing_name = ing.get("name", "").strip()
+                if not ing_name:
+                    continue
+                    
+                # Find existing ingredient using global client to bypass read restrictions if any
+                ing_res = supabase.table("ingredients").select("id").ilike("name", ing_name).execute()
+                if ing_res.data:
+                    ingredient_id = ing_res.data[0]["id"]
+                else:
+                    # Create new ingredient in catalog (requires global client to bypass RLS)
+                    new_ing = supabase.table("ingredients").insert({
+                        "name": ing_name,
+                        "category": "Other"
+                    }).execute()
+                    ingredient_id = new_ing.data[0]["id"]
+                    
+                recipe_ingredients_to_insert.append({
+                    "recipe_id": recipe_id,
+                    "ingredient_id": ingredient_id,
+                    "measurement_value": str(ing.get("quantity", "")),
+                    "is_essential": ing.get("is_essential", False)
+                })
+                
+            # Insert all into recipe_ingredients
+            if recipe_ingredients_to_insert:
+                # Use global client since recipe_ingredients writes are restricted to backend service role
+                supabase.table("recipe_ingredients").insert(recipe_ingredients_to_insert).execute()
+
         logger.info(f"Recipe record created with id: {recipe_id}. Custom recipe creation complete.")
 
         return {
