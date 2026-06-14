@@ -46,14 +46,8 @@ app = FastAPI(
 )
 
 # CORS configuration
-origins = [
-    "https://ais-dev-qtjuilbx4zfshehl6yqen7-934525312260.europe-west2.run.app",
-    "https://ais-pre-qtjuilbx4zfshehl6yqen7-934525312260.europe-west2.run.app",
-    "http://localhost:3000",
-    "http://localhost:5173", # Standard local React/Vite port
-    "https://ais-dev-5k5xeohw6i3lge2dd5qjs6-353443648426.europe-west2.run.app",
-    "https://ais-pre-5k5xeohw6i3lge2dd5qjs6-353443648426.europe-west2.run.app",
-]
+settings_global = get_settings()
+origins = [origin.strip() for origin in settings_global.cors_origins.split(",")] if settings_global.cors_origins else []
 
 app.add_middleware(
     CORSMiddleware,

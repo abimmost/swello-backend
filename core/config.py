@@ -7,6 +7,7 @@ class Settings(BaseSettings):
     supabase_key: str
     gemini_api_key: str
     ngrok_authtoken: Optional[str] = None
+    cors_origins: str
 
     class Config:
         env_file = ".env"
