@@ -6,6 +6,7 @@ from .meals import MealResponse
 
 class IngredientBase(BaseModel):
     name: str
+    name_fr: Optional[str] = None
     category: Optional[str] = None
 
 class IngredientResponse(IngredientBase):
@@ -23,7 +24,9 @@ class RecipeIngredientResponse(RecipeIngredientBase):
 
 class RecipeBase(BaseModel):
     steps: List[str] = []
+    steps_fr: List[str] = []
     cookware: List[str] = []
+    cookware_fr: List[str] = []
 
 class RecipeResponse(RecipeBase):
     id: UUID

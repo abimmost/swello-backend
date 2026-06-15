@@ -217,6 +217,7 @@ async def _call_gemini_for_edit(
 4. Estimate the new cooking time in minutes.
 5. Calculate a new Balanced Level Score from 0-100 (where 100 is perfectly balanced across protein, carbs, fat, and micronutrients).
 6. Provide the adjusted cooking steps and cookware list with the ingredient removed.
+7. Provide the French translations for the insights, adjusted steps, adjusted cookware, and the original recipe's title and description.
 """
 
     logger.debug(f"AI Editor: Sending prompt to Gemini (length: {len(prompt)} chars)")

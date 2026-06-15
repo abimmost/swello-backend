@@ -1,91 +1,122 @@
-# Swello Backend API
+# ⚙️ Swello Backend API
 
-The backend for **Swello**, a culturally adapted nutritional mobile application designed for Cameroon. It powers the recipe discovery, meal planning, custom nutritional scoring, and Gemini-based AI meal editing features.
+The backend engine for **Swello**, a culturally adapted nutritional mobile application designed for Cameroon. Built using **FastAPI**, **Supabase (PostgreSQL)**, and **Google Gemini (Interactions API)**.
 
-Built with **FastAPI** and **Supabase (PostgreSQL)**, this backend acts as the data layer and business logic hub, serving the Swello React/Capacitor frontend.
-
----
-
-## ⚡ Core Features
-
-- **Nutritional Intelligence**: Computes the proprietary **Balanced Level Score (BLS)**, a 0–100 metric evaluating macronutrient distribution (25% protein, 50% carbs, 25% fat) and micronutrient diversity.
-- **AI Meal Editor**: Integrates with the **Gemini Interactions API** to allow users to customize meals (e.g., "remove chicken"). The AI recalculates macros, adjusts cooking steps, and importantly, prevents the removal of essential/structural ingredients.
-- **Cultural Measurement Support**: Fully supports "Estimates" (Anatomical, Volumetric, Natural, Localized units) tailored for Cameroonian cooking practices.
-- **Dynamic Aggregation**: Offloads heavy data aggregation (like Weekly Nutrition Summaries) from the frontend client to the backend for performance.
+This server manages recipe lookups, meal planning logic, user metadata, database transactions, custom nutrient calculations, and AI-powered meal adjustments.
 
 ---
 
-## 🏗️ Architecture & Documentation
+## ⚡ Core Highlights
 
-To keep the codebase maintainable, business logic is isolated from HTTP route handlers.
+*   **Proprietary Balanced Level Score (BLS)**: Computes a 0–100 score indicating how closely a meal's macros match the ideal Cameroonian profile (25% Protein, 50% Carbs, 25% Fat), weighted by micro-nutrient variety.
+*   **Structured Gemini AI Integration**: Utilizes the modern `google-genai` Interactions SDK for structured JSON generation. The AI updates ingredients, instructions, and cookware while strictly enforcing ingredient constraints (refusing to allow structural ingredients to be removed).
+*   **Offloaded Calculation Load**: Daily and weekly nutrient aggregations are compiled server-side to optimize battery usage and speed up rendering on mobile webviews.
+*   **Container-Optimized Logging**: A custom logging pipeline streams clean text directly to stdout, facilitating seamless log aggregation on services like Render.
 
-- **`api/`**: FastAPI routers defining REST endpoints.
-- **`core/`**: Initialization (Supabase, Auth, settings).
-- **`models/`**: Pydantic schemas validating all incoming/outgoing data.
-- **`services/`**: Pure business logic (e.g., `nutrition.py`, `ai_editor.py`).
+---
 
-**Deep-Dive Documentation:**
-For a complete breakdown of the architecture, data models, and API contracts, see the `swello-docs` folder:
-- [API Endpoints Guide](../../swello-docs/api-endpoints.md)
-- [Backend Architecture Guide](../../swello-docs/backend-architecture.md)
+## 🏗️ Directory Architecture
+
+The backend implements a modular structure to isolate routing, business logic, validation, and core configuration:
+
+```
+swello-backend/
+├── api/             # FastAPI HTTP endpoint routers
+├── core/            # Application settings, DB, and Auth initialization
+├── models/          # Pydantic schemas enforcing request/response structures
+├── services/        # Pure business logic (Scoring engines, Gemini Prompt service)
+├── utils/           # Loggers and helper scripts
+├── main.py          # Entry point of the FastAPI application
+├── requirements.txt # Python dependency file
+└── render.yaml      # Render infrastructure-as-code blueprint
+```
+
+### 📂 Codebase Breakdown
+
+#### 📁 `api/` (Routers)
+Defines REST routes, handles HTTP exceptions, and communicates with the service layers:
+*   **`ai.py`**: Invokes AI meal customizations (`POST /ai/recipe-edit`) and custom recipe calculations (`POST /ai/nutrition/calculate`).
+*   **`ingredients.py`**: Exposes `/ingredients` for debounced autocomplete searches in the search view.
+*   **`meal_plans.py`**: Handles Monday-to-Sunday planner schedules, with automatic weekly plan setup.
+*   **`recipes.py`**: Serves recipe discovery feeds, AND-logic ingredient searches, bookmarking, and custom recipe creations.
+*   **`users.py`**: Manages personal profile data using RLS checks.
+
+#### 📁 `core/` (Configurations)
+*   **`auth.py`**: Validates incoming Bearer JWTs via Supabase and provides the `get_authed_client` dependency, ensuring all user writes respect Row Level Security.
+*   **`config.py`**: Loads and validates variables from `.env` or system environment configurations using Pydantic Settings.
+*   **`supabase.py`**: Exposes the generic public database client.
+
+#### 📁 `models/` (Data Schemas)
+Houses the strict interface contracts for all endpoints:
+*   **`ai.py`**: Contains strict output schemas (`GeminiEditResult`, `MacroShift`) that force Gemini responses to match frontend typescript interfaces.
+*   **`meal_plans.py`**: Validates planning operations and maps weekly nutritional balances.
+*   **`meals.py`**: Models raw meal entities, tags, and macronutrients.
+*   **`recipes.py`**: Enforces strict payload parameters for editing and creating custom recipes.
+
+#### 📁 `services/` (Business Logic)
+*   **`ai_editor.py`**: Pre-validates ingredient removal lists against essential items. Manages prompts, formats models, and executes the Gemini query with fallback routines (automatically retrying multiple Gemini model versions on failure).
+*   **`nutrition.py`**: Contains the formula for the Balanced Level Score (BLS).
 
 ---
 
 ## 🚀 Getting Started (Local Development)
 
 ### Prerequisites
-- Python 3.10+
-- A Supabase project instance
-- A Gemini API Key
+*   [Python 3.10+](https://www.python.org/)
+*   A running Supabase instance (configured using the migration files inside `swello-sql/`)
+*   A Google Gemini API key
 
 ### 1. Installation
-Clone the repo and navigate to the backend directory:
-```bash
-cd swello-app/swello-backend
-```
+1.  Clone the repository and enter the directory:
+    ```bash
+    cd swello-app/swello-backend
+    ```
+2.  Create and activate a virtual environment:
+    ```bash
+    python -m venv .venv
+    # Windows:
+    .venv\Scripts\activate
+    # macOS/Linux:
+    source .venv/bin/activate
+    ```
+3.  Install dependencies:
+    ```bash
+    pip install -r requirements.txt
+    ```
 
-Install the required Python dependencies:
-```bash
-pip install -r requirements.txt
-```
-
-### 2. Environment Variables
-Copy `.env.example` to `.env`:
+### 2. Environment Setup
+Copy `.env.example` to a new file named `.env`:
 ```bash
 cp .env.example .env
 ```
-Fill in the credentials:
-- `SUPABASE_URL` and `SUPABASE_KEY`
-- `GEMINI_API_KEY`
-
-### 3. Run the Server
-Start the FastAPI development server using Uvicorn (configured to use standard output for logs, optimized for platforms like Render):
-```bash
-python main.py
-# or directly:
-uvicorn main:app --reload
+Fill out the variables:
+```env
+SUPABASE_URL="https://your-supabase-url.supabase.co"
+SUPABASE_KEY="your-supabase-anon-key"
+GEMINI_API_KEY="your-google-gemini-key"
+NGROK_AUTHTOKEN="optional-ngrok-token-for-tunneling"
+CORS_ORIGINS="http://localhost:3000,http://localhost:5173"
 ```
 
-The server will be available at `http://localhost:8000`.
-
-### 4. Interactive API Docs
-FastAPI automatically generates interactive Swagger documentation. Once the server is running, visit:
-[http://localhost:8000/docs](http://localhost:8000/docs)
+### 3. Start the Dev Server
+Run the application wrapper:
+```bash
+python main.py
+```
+Or launch Uvicorn directly:
+```bash
+uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+```
+API docs will be available locally at `http://localhost:8000/docs`.
 
 ---
 
 ## ☁️ Deployment (Render Blueprint)
 
-This project is pre-configured for one-click deployment on **Render** using a Blueprint configuration file (`render.yaml`).
+This project contains a [render.yaml](file:///c:/Users/gwe/Documents/MY%20WORK/PROJECTS/plan-and-diet-app-defense-project/swello-app/swello-backend/render.yaml) file, enabling zero-config deployment on **Render**:
 
-### Deploying to Render
-1. Push this backend repository (`swello-app/swello-backend/` is its own Git repo) to your GitHub/GitLab account.
-2. In the Render Dashboard, go to **Blueprints** and click **New Blueprint Instance**.
-3. Select your repository. Render will auto-detect the `render.yaml` configuration.
-4. Render will prompt you to fill in the following environment variables:
-   * `SUPABASE_URL`: Your Supabase project URL.
-   * `SUPABASE_KEY`: Your Supabase project anonymous public/anon key (or service_role key if needed).
-   * `GEMINI_API_KEY`: Your Google Gemini API Key.
-   * `CORS_ORIGINS`: Comma-separated list of allowed origins (e.g., your Vercel deployment URL and local ports: `https://your-app.vercel.app,http://localhost:3000,http://localhost:5173`).
-5. Click **Approve** to deploy.
-
+1.  Push your backend repository to GitHub or GitLab.
+2.  On the Render Dashboard, click **New** > **Blueprint**.
+3.  Connect your repository.
+4.  Provide values for the requested variables (`SUPABASE_URL`, `SUPABASE_KEY`, `GEMINI_API_KEY`, and `CORS_ORIGINS`).
+5.  Click **Approve**. Render will automatically orchestrate the build and spin up the FastAPI service.

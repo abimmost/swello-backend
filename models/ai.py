@@ -61,6 +61,11 @@ class GeminiEditResult(BaseModel):
     new_balanced_level_score: Optional[int] = Field(default=None, description="The new Balanced Level Score (0-100) after the edit.")
     adjusted_steps: List[str] = Field(default_factory=list, description="The adjusted cooking steps after the ingredient removal.")
     adjusted_cookware: List[str] = Field(default_factory=list, description="The adjusted cookware list after the ingredient removal.")
+    insights_fr: List[str] = Field(default_factory=list, description="The human-readable insights translated into French.")
+    adjusted_steps_fr: List[str] = Field(default_factory=list, description="The adjusted cooking steps translated into French.")
+    adjusted_cookware_fr: List[str] = Field(default_factory=list, description="The adjusted cookware list translated into French.")
+    title_fr: Optional[str] = Field(default=None, description="The title of the meal translated into French.")
+    description_fr: Optional[str] = Field(default=None, description="The description of the meal translated into French.")
 
 class NutritionEstimate(BaseModel):
     """Structured output for Gemini nutrition estimation."""

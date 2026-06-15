@@ -26,7 +26,9 @@ class NutrientProfileResponse(NutrientProfileBase):
 
 class MealBase(BaseModel):
     title: str
+    title_fr: Optional[str] = None
     description: Optional[str] = None
+    description_fr: Optional[str] = None
     image_url: Optional[str] = None
     tags: List[str] = []
     duration_minutes: Optional[int] = None
