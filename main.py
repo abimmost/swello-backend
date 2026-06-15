@@ -1,6 +1,3 @@
-import os
-
-import uvicorn
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from utils.logger import setup_logger
@@ -69,9 +66,3 @@ app.include_router(ingredients_router)
 def health_check():
     logger.info("Health check endpoint called")
     return {"status": "ok", "message": "Swello API is running"}
-
-if __name__ == "__main__":
-    # Start the Swello FastAPI server
-    port = int(os.environ.get("PORT", 8000))
-    print(f"⚡ Swello Backend booting on port {port}...")
-    uvicorn.run(app, port=port)
