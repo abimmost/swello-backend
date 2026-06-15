@@ -134,6 +134,8 @@ def aggregate_weekly_nutrition(plans_data: list) -> dict:
     total_vit_a = 0.0
     total_calcium = 0.0
     total_potassium = 0.0
+    total_bls = 0.0
+    bls_count = 0
     days_with_meals = set()
 
     if not plans_data:
@@ -161,6 +163,11 @@ def aggregate_weekly_nutrition(plans_data: list) -> dict:
             total_calcium += nutrient_profile.get("calcium_mg", 0) or 0
             total_potassium += nutrient_profile.get("potassium_mg", 0) or 0
 
+            meal_bls = meal.get("balanced_level_score")
+            if meal_bls is not None:
+                total_bls += meal_bls
+                bls_count += 1
+
             scheduled_date = planned_meal.get("scheduled_date")
             if scheduled_date:
                 days_with_meals.add(scheduled_date)
@@ -181,17 +188,10 @@ def aggregate_weekly_nutrition(plans_data: list) -> dict:
     carb_pct = round((total_carbs / total_macros) * 100, 1)
     fat_pct = round((total_fat / total_macros) * 100, 1)
 
-    weekly_score = calculate_balanced_level_score({
-        "protein_grams": total_protein,
-        "carb_grams": total_carbs,
-        "fat_grams": total_fat,
-        "fiber_g": total_fiber,
-        "iron_mg": total_iron,
-        "vitamin_c_mg": total_vit_c,
-        "vitamin_a_iu": total_vit_a,
-        "calcium_mg": total_calcium,
-        "potassium_mg": total_potassium,
-    })
+    if bls_count > 0:
+        weekly_score = round(total_bls / bls_count)
+    else:
+        weekly_score = 0
 
     logger.debug(
         f"Weekly aggregation: P={protein_pct}%, C={carb_pct}%, F={fat_pct}%, "
