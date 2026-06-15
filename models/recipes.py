@@ -52,3 +52,8 @@ class CreateRecipeRequest(BaseModel):
     steps: List[str] = []
     cookware: List[str] = []
     is_custom: Optional[bool] = False
+    parent_recipe_id: Optional[str] = None
+    balanced_level_score: Optional[int] = None
+    protein_grams: Optional[float] = None
+    carb_grams: Optional[float] = None
+    fat_grams: Optional[float] = None

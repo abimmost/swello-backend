@@ -4,7 +4,7 @@ from datetime import timedelta, datetime, time as dt_time
 from supabase import Client
 from core.supabase import supabase
 from core.auth import get_current_user, get_authed_client
-from models.meal_plans import AddPlannedMealRequest
+from models.meal_plans import AddPlannedMealRequest, UpdatePlannedMealStatusRequest
 from services.nutrition import calculate_balanced_level_score, aggregate_weekly_nutrition
 from utils.logger import setup_logger
 
@@ -124,5 +124,25 @@ async def remove_from_meal_plan(
         return {"status": "success", "message": "Planned meal removed"}
     except Exception as e:
         logger.error(f"Error removing planned meal: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+@router.patch("/{plan_id}/status")
+async def update_planned_meal_status(
+    plan_id: str,
+    request: UpdatePlannedMealStatusRequest,
+    current_user: Any = Depends(get_current_user),
+    authed_client: Client = Depends(get_authed_client)
+):
+    """Update the status of a planned meal (e.g., to 'prepared')."""
+    logger.info(f"Updating status for planned meal {plan_id} to '{request.status}' for user {current_user.id}")
+    try:
+        response = authed_client.table("planned_meals").update({"status": request.status}).eq("id", plan_id).execute()
+        if not response.data:
+            raise HTTPException(status_code=404, detail="Planned meal not found")
+        return {"status": "success", "data": response.data[0]}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error updating planned meal status: {e}")
         raise HTTPException(status_code=500, detail="Internal server error")
 

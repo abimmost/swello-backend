@@ -17,7 +17,7 @@ async def list_recipes(
 ):
     logger.info(f"Fetching recipes - limit: {limit}, offset: {offset}")
     try:
-        response = supabase.table("recipes").select("*, meals(*)").eq("is_ai_generated", False).range(offset, offset + limit - 1).execute()
+        response = supabase.table("recipes").select("*, meals(*, profiles(display_name))").eq("is_ai_generated", False).range(offset, offset + limit - 1).execute()
         return response.data
     except Exception as e:
         logger.error(f"Error fetching recipes: {e}")
@@ -95,7 +95,7 @@ async def get_recipe(recipe_id: str):
     logger.info(f"Fetching recipe details for: {recipe_id}")
     try:
         response = supabase.table("recipes").select(
-            "*, meals(*), recipe_ingredients(*, ingredients(*))"
+            "*, meals(*, nutrient_profiles(*), profiles(display_name)), recipe_ingredients(*, ingredients(*))"
         ).eq("id", recipe_id).single().execute()
 
         if not response.data:
@@ -128,6 +128,7 @@ async def create_recipe(
             "duration_minutes": request.duration_minutes,
             "is_custom": True,
             "author_id": str(current_user.id),
+            "balanced_level_score": request.balanced_level_score,
         }).execute()
 
         if not meal_response.data:
@@ -142,6 +143,7 @@ async def create_recipe(
             "steps": request.steps,
             "cookware": request.cookware,
             "is_ai_generated": request.is_custom if request.is_custom is not None else False,
+            "parent_recipe_id": request.parent_recipe_id,
             "editor_id": str(current_user.id),
         }).execute()
 
@@ -158,13 +160,13 @@ async def create_recipe(
                 if not ing_name:
                     continue
                     
-                # Find existing ingredient using global client to bypass read restrictions if any
-                ing_res = supabase.table("ingredients").select("id").ilike("name", ing_name).execute()
+                # Find existing ingredient using authed_client
+                ing_res = authed_client.table("ingredients").select("id").ilike("name", ing_name).execute()
                 if ing_res.data:
                     ingredient_id = ing_res.data[0]["id"]
                 else:
-                    # Create new ingredient in catalog (requires global client to bypass RLS)
-                    new_ing = supabase.table("ingredients").insert({
+                    # Create new ingredient in catalog using authed_client
+                    new_ing = authed_client.table("ingredients").insert({
                         "name": ing_name,
                         "category": "Other"
                     }).execute()
@@ -179,8 +181,17 @@ async def create_recipe(
                 
             # Insert all into recipe_ingredients
             if recipe_ingredients_to_insert:
-                # Use global client since recipe_ingredients writes are restricted to backend service role
-                supabase.table("recipe_ingredients").insert(recipe_ingredients_to_insert).execute()
+                # Use authed_client now that RLS policies allow editor to insert
+                authed_client.table("recipe_ingredients").insert(recipe_ingredients_to_insert).execute()
+
+        # 4. Insert nutrient profile if macros are provided
+        if request.protein_grams is not None:
+            authed_client.table("nutrient_profiles").insert({
+                "meal_id": meal_id,
+                "protein_grams": request.protein_grams,
+                "carb_grams": request.carb_grams,
+                "fat_grams": request.fat_grams,
+            }).execute()
 
         logger.info(f"Recipe record created with id: {recipe_id}. Custom recipe creation complete.")
 
@@ -224,5 +235,41 @@ async def bookmark_recipe(
         return {"status": "success", "message": "Recipe bookmarked"}
     except Exception as e:
         logger.error(f"Error bookmarking recipe {recipe_id}: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+@router.delete("/{recipe_id}")
+async def delete_custom_recipe(
+    recipe_id: str,
+    current_user: Any = Depends(get_current_user),
+    authed_client: Client = Depends(get_authed_client)
+):
+    """Deletes a custom/AI-generated recipe created by the user."""
+    logger.info(f"Deleting recipe {recipe_id} for user {current_user.id}")
+    try:
+        # First, fetch the recipe to get the meal_id and ensure it belongs to the user
+        recipe_response = authed_client.table("recipes").select("meal_id, editor_id").eq("id", recipe_id).execute()
+        if not recipe_response.data:
+            raise HTTPException(status_code=404, detail="Recipe not found")
+            
+        recipe = recipe_response.data[0]
+        if str(recipe.get("editor_id")) != str(current_user.id):
+            raise HTTPException(status_code=403, detail="Not authorized to delete this recipe")
+            
+        meal_id = recipe["meal_id"]
+        
+        # Delete the parent meal (which will cascade to recipes, recipe_ingredients, bookmarks, planned_meals)
+        # We ensure it only deletes if the author_id matches and it's a custom meal
+        delete_response = authed_client.table("meals").delete().eq("id", meal_id).eq("author_id", str(current_user.id)).eq("is_custom", True).execute()
+        
+        if not delete_response.data:
+            # Fallback if the meal deletion didn't work (e.g. not a custom meal or mismatch)
+            raise HTTPException(status_code=400, detail="Could not delete recipe. Ensure it is a custom recipe you authored.")
+            
+        logger.info(f"Custom recipe {recipe_id} and parent meal {meal_id} deleted successfully.")
+        return {"status": "success", "message": "Recipe deleted successfully"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error deleting recipe {recipe_id}: {e}")
         raise HTTPException(status_code=500, detail="Internal server error")
 

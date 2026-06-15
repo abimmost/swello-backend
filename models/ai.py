@@ -3,9 +3,9 @@ from typing import List, Optional
 
 
 class MacroShift(BaseModel):
-    protein_shift_g: float
-    carb_shift_g: float
-    fat_shift_g: float
+    protein_g: float
+    carb_g: float
+    fat_g: float
     protein_percentage: float
     carb_percentage: float
     fat_percentage: float
@@ -44,9 +44,9 @@ class NutritionCalculateRequest(BaseModel):
 
 class GeminiMacroShift(BaseModel):
     """The macro shift returned by Gemini after removing an ingredient."""
-    protein_shift_g: float = Field(description="Change in protein grams (negative means decrease).")
-    carb_shift_g: float = Field(description="Change in carb grams (negative means decrease).")
-    fat_shift_g: float = Field(description="Change in fat grams (negative means decrease).")
+    new_protein_g: float = Field(description="New total protein in grams.")
+    new_carb_g: float = Field(description="New total carbs in grams.")
+    new_fat_g: float = Field(description="New total fat in grams.")
     new_protein_percentage: float = Field(description="New protein percentage of the modified meal.")
     new_carb_percentage: float = Field(description="New carb percentage of the modified meal.")
     new_fat_percentage: float = Field(description="New fat percentage of the modified meal.")

@@ -69,3 +69,17 @@ async def remove_bookmark(
     except Exception as e:
         logger.error(f"Error removing bookmark: {e}")
         raise HTTPException(status_code=500, detail="Internal server error")
+
+@router.get("/me/recipes")
+async def get_my_recipes(
+    current_user: Any = Depends(get_current_user),
+    authed_client: Client = Depends(get_authed_client)
+):
+    """Fetch custom/AI recipes edited by the user."""
+    logger.info(f"Fetching authored recipes for user: {current_user.id}")
+    try:
+        response = authed_client.table("recipes").select("*, meals(*)").eq("editor_id", str(current_user.id)).execute()
+        return response.data
+    except Exception as e:
+        logger.error(f"Error fetching authored recipes: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error")

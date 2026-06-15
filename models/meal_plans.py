@@ -64,3 +64,7 @@ class AddPlannedMealRequest(BaseModel):
     meal_id: str
     scheduled_date: str  # YYYY-MM-DD
     scheduled_time: Optional[str] = None  # HH:MM
+
+class UpdatePlannedMealStatusRequest(BaseModel):
+    """Request body for PATCH /meal-plan/{plan_id}/status."""
+    status: str

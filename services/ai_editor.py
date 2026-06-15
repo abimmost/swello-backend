@@ -125,9 +125,9 @@ async def validate_and_edit_recipe(recipe_id: str, intended_change: str) -> dict
         "validation_error": gemini_result.validation_error,
         "insights": gemini_result.insights,
         "macro_shift": {
-            "protein_shift_g": gemini_result.macro_shift.protein_shift_g,
-            "carb_shift_g": gemini_result.macro_shift.carb_shift_g,
-            "fat_shift_g": gemini_result.macro_shift.fat_shift_g,
+            "protein_g": gemini_result.macro_shift.new_protein_g,
+            "carb_g": gemini_result.macro_shift.new_carb_g,
+            "fat_g": gemini_result.macro_shift.new_fat_g,
             "protein_percentage": gemini_result.macro_shift.new_protein_percentage,
             "carb_percentage": gemini_result.macro_shift.new_carb_percentage,
             "fat_percentage": gemini_result.macro_shift.new_fat_percentage,
@@ -212,7 +212,7 @@ async def _call_gemini_for_edit(
 
 ## Instructions:
 1. Determine if this edit is valid. If an ingredient marked ESSENTIAL is being removed, set is_valid to false and explain why.
-2. If valid, calculate the macro nutrient shifts (how protein, carbs, and fat change in grams).
+2. If valid, calculate the NEW TOTAL absolute macronutrients in grams for the entire meal (protein, carbs, and fat).
 3. Provide 2-4 concise insights about how this change affects the meal (e.g., "Becomes vegetarian-friendly", "Protein drops significantly").
 4. Estimate the new cooking time in minutes.
 5. Calculate a new Balanced Level Score from 0-100 (where 100 is perfectly balanced across protein, carbs, fat, and micronutrients).

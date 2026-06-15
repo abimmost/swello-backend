@@ -128,6 +128,12 @@ def aggregate_weekly_nutrition(plans_data: list) -> dict:
     total_protein = 0.0
     total_carbs = 0.0
     total_fat = 0.0
+    total_fiber = 0.0
+    total_iron = 0.0
+    total_vit_c = 0.0
+    total_vit_a = 0.0
+    total_calcium = 0.0
+    total_potassium = 0.0
     days_with_meals = set()
 
     if not plans_data:
@@ -148,6 +154,12 @@ def aggregate_weekly_nutrition(plans_data: list) -> dict:
             total_protein += nutrient_profile.get("protein_grams", 0) or 0
             total_carbs += nutrient_profile.get("carb_grams", 0) or 0
             total_fat += nutrient_profile.get("fat_grams", 0) or 0
+            total_fiber += nutrient_profile.get("fiber_g", 0) or 0
+            total_iron += nutrient_profile.get("iron_mg", 0) or 0
+            total_vit_c += nutrient_profile.get("vitamin_c_mg", 0) or 0
+            total_vit_a += nutrient_profile.get("vitamin_a_iu", 0) or 0
+            total_calcium += nutrient_profile.get("calcium_mg", 0) or 0
+            total_potassium += nutrient_profile.get("potassium_mg", 0) or 0
 
             scheduled_date = planned_meal.get("scheduled_date")
             if scheduled_date:
@@ -173,6 +185,12 @@ def aggregate_weekly_nutrition(plans_data: list) -> dict:
         "protein_grams": total_protein,
         "carb_grams": total_carbs,
         "fat_grams": total_fat,
+        "fiber_g": total_fiber,
+        "iron_mg": total_iron,
+        "vitamin_c_mg": total_vit_c,
+        "vitamin_a_iu": total_vit_a,
+        "calcium_mg": total_calcium,
+        "potassium_mg": total_potassium,
     })
 
     logger.debug(
