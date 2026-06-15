@@ -5,7 +5,7 @@ services:
     region: frankfurt
     repo: https://github.com/abimmost/swello-backend.git
     branch: main
-    autoDeployTrigger: "off"
+    autoDeploy: true
     plan: free
     buildCommand: "python -m pip install --upgrade pip && pip install -r requirements.txt"
     startCommand: "uvicorn main:app --host 0.0.0.0 --port $PORT"
