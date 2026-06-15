@@ -42,5 +42,12 @@ def get_authed_client(credentials: HTTPAuthorizationCredentials = Depends(securi
     token = credentials.credentials
     settings = get_settings()
     client: Client = create_client(settings.supabase_url, settings.supabase_key)
-    client.auth.set_session(token, token)
+    try:
+        client.auth.set_session(token, token)
+    except Exception as e:
+        logger.error(f"Failed to set auth session (Timeout or API error): {e}")
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Authentication service is temporarily unavailable. Please try again."
+        )
     return client

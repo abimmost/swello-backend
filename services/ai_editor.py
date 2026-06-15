@@ -10,6 +10,8 @@ HARD RULE: The AI must validate and reject impossible removals
 (e.g., flour from cookies) with an explanation.
 """
 from google import genai
+from google.genai import types
+import asyncio
 from pydantic import BaseModel, Field
 from typing import List, Optional
 from models.ai import GeminiEditResult, NutritionEstimate
@@ -27,21 +29,26 @@ FALLBACK_MODELS = [
     "gemini-2.5-flash-lite"
 ]
 
-def _execute_with_fallback(prompt: str, schema: dict) -> str:
-    """Executes the Gemini API call with rate limit detection and fallback routing."""
+async def _execute_with_fallback(prompt: str, schema: dict) -> str:
+    """Executes the Gemini API call with rate limit detection, fallback routing, and 40s timeout."""
     for model_name in FALLBACK_MODELS:
         try:
             logger.debug(f"AI Editor: Attempting Gemini call with model {model_name}")
-            interaction = client.interactions.create(
-                model=model_name,
-                input=prompt,
-                response_format={
-                    "type": "text",
-                    "mime_type": "application/json",
-                    "schema": schema
-                },
+            response = await asyncio.wait_for(
+                client.aio.models.generate_content(
+                    model=model_name,
+                    contents=prompt,
+                    config=types.GenerateContentConfig(
+                        response_mime_type="application/json",
+                        response_schema=schema,
+                    )
+                ),
+                timeout=40.0
             )
-            return interaction.output_text
+            return response.text
+        except asyncio.TimeoutError:
+            logger.warning(f"AI Editor: Model {model_name} timed out after 40s. Falling back...")
+            continue
         except Exception as e:
             error_msg = str(e).lower()
             # 429 Too Many Requests, Quota Exceeded, or Resource Exhausted
@@ -52,7 +59,7 @@ def _execute_with_fallback(prompt: str, schema: dict) -> str:
                 logger.error(f"AI Editor: Non-rate-limit error with {model_name}: {e}")
                 raise e
     
-    raise Exception("All fallback models exhausted due to rate limits.")
+    raise Exception("All fallback models exhausted due to rate limits or timeouts.")
 
 # --- Initialize Gemini client ---
 
@@ -230,7 +237,7 @@ async def _call_gemini_for_edit(
     logger.debug(f"AI Editor: Sending prompt to Gemini (length: {len(prompt)} chars)")
 
     try:
-        output_text = _execute_with_fallback(
+        output_text = await _execute_with_fallback(
             prompt=prompt,
             schema=GeminiEditResult.model_json_schema()
         )
@@ -277,7 +284,7 @@ Calculate a Balanced Level Score from 0-100 based on the nutritional balance.
 """
 
     try:
-        output_text = _execute_with_fallback(
+        output_text = await _execute_with_fallback(
             prompt=prompt,
             schema=NutritionEstimate.model_json_schema()
         )
