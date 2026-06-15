@@ -46,14 +46,18 @@ class CreateRecipeRequest(BaseModel):
     """Request body for creating a custom user recipe (POST /recipes)."""
     # Meal fields
     title: str
+    title_fr: Optional[str] = None
     description: Optional[str] = None
+    description_fr: Optional[str] = None
     image_url: Optional[str] = None
     tags: List[str] = []
     duration_minutes: Optional[int] = None
     # Recipe fields
     ingredients: List[dict] = []
     steps: List[str] = []
+    steps_fr: List[str] = []
     cookware: List[str] = []
+    cookware_fr: List[str] = []
     is_custom: Optional[bool] = False
     parent_recipe_id: Optional[str] = None
     balanced_level_score: Optional[int] = None

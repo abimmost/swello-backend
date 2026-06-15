@@ -129,6 +129,8 @@ async def create_recipe(
             "is_custom": True,
             "author_id": str(current_user.id),
             "balanced_level_score": request.balanced_level_score,
+            "title_fr": request.title_fr,
+            "description_fr": request.description_fr,
         }).execute()
 
         if not meal_response.data:
@@ -142,6 +144,8 @@ async def create_recipe(
             "meal_id": meal_id,
             "steps": request.steps,
             "cookware": request.cookware,
+            "steps_fr": request.steps_fr,
+            "cookware_fr": request.cookware_fr,
             "is_ai_generated": request.is_custom if request.is_custom is not None else False,
             "parent_recipe_id": request.parent_recipe_id,
             "editor_id": str(current_user.id),

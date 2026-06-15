@@ -134,6 +134,13 @@ async def validate_and_edit_recipe(recipe_id: str, intended_change: str) -> dict
         } if gemini_result.macro_shift else None,
         "new_time": gemini_result.new_cooking_time_minutes,
         "new_score": gemini_result.new_balanced_level_score,
+        "adjusted_steps": gemini_result.adjusted_steps,
+        "adjusted_cookware": gemini_result.adjusted_cookware,
+        "insights_fr": gemini_result.insights_fr,
+        "adjusted_steps_fr": gemini_result.adjusted_steps_fr,
+        "adjusted_cookware_fr": gemini_result.adjusted_cookware_fr,
+        "title_fr": gemini_result.title_fr,
+        "description_fr": gemini_result.description_fr,
     }
     logger.info(f"AI Editor: Edit analysis complete. Valid: {response['is_valid']}, New score: {response.get('new_score')}")
     return response

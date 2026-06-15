@@ -18,6 +18,13 @@ class AIEditResponse(BaseModel):
     macro_shift: Optional[MacroShift] = None
     new_time: Optional[int] = None
     new_score: Optional[int] = None
+    adjusted_steps: List[str] = []
+    adjusted_cookware: List[str] = []
+    insights_fr: List[str] = []
+    adjusted_steps_fr: List[str] = []
+    adjusted_cookware_fr: List[str] = []
+    title_fr: Optional[str] = None
+    description_fr: Optional[str] = None
 
 
 # --- Request schemas (used by api/ai.py) ---
